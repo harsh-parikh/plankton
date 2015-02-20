@@ -4,7 +4,7 @@ import os
 import numpy as np
 import cv2
 import pickle
-import sklearn.svm as svm
+from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from pylab import *
 import random
@@ -674,6 +674,162 @@ def processImgPostSift( bow, dataInput, dataOutput ):
 
 #--------------------------------------------------------------------
 
+def processImages_UnShuffled(dimension):
+    classNames = open('classNames.txt','r')
+    data = open('dataUnShuffled.pickle','w')
+    itr = 0
+    mem = []
+    for folderName in classNames:
+        folderName = (folderName.split('\n'))[0]
+        y = itr
+        print folderName
+        imgNames = [ f for f in os.listdir(folderName) ]
+        for img in imgNames:
+            if 'o' not in img:
+                i = cv2.imread(folderName+'/'+img+'')
+                shp = np.shape(i)
+                max_l = max(shp)
+                img = np.zeros((max_l,max_l,3), np.uint8) + 255
+                img[ 0:shp[0], 0:shp[1], 0:shp[2] ] = i
+                i = cv2.resize( img,( dimension, dimension ), interpolation = cv2.INTER_AREA)
+                i = ( ( i[:,:,0]/3.0) + (i[:,:,1]/3.0) + (i[:,:,2] /3.0) )
+                i = np.reshape( i, (dimension*dimension,) )
+                mem.append( (i,y) )
+        itr = itr + 1
+    memx = []
+    memy = []
+    for e in mem:
+        memx.append( e[0] )
+        memy.append( e[1] )
+    pickle.dump( (np.array(memx),np.array(memy)) , data )
+    data.close()
+    print 'done'
+
+def processImgsToSiftUnShuffled():
+    classNames = open('classNames.txt','r')
+    data = open('dataSIFTedUnShuffled.pickle','w')
+    itr = 0
+    mem = []
+    for folderName in classNames:
+        folderName = (folderName.split('\n'))[0]
+        y = itr
+        print folderName
+        imgNames = [ f for f in os.listdir(folderName) ]
+        for img in imgNames:
+            if 'o' not in img:
+                kp = siftFV(img,folderName)
+                imgKP = []
+                for v in kp:
+                    w = [ v.pt, v.size ]
+                    imgKP.append(w)
+                mem.append( (imgKP,y) )
+        itr = itr + 1
+    memx = []
+    memy = []
+    for e in mem:
+        memx.append( e[0] )
+        memy.append( e[1] )
+    pickle.dump( (memx,memy) , data )
+    data.close()
+    print 'done'
+
+def processImgPostSift_UnShuffled( bow, dataInput, dataOutput ):
+    print 'Converting Raw Images to Bag of Words Representation ...'
+    f = open(dataInput,'r')
+    w = pickle.load(f)
+    xX, yY = w
+    print 'Data from '+str(dataInput)+' fetched'
+    nEx = (len(xX))
+    print 'Number of data points is '+str(nEx)
+    mem = []
+    for i in range(0,nEx):
+        iv = getIMGvec( bow, xX[i] )
+        mem.append( [iv,yY[i]] )
+    memx = []
+    memy = []
+    for e in mem:
+        memx.append( e[0] )
+        memy.append( e[1] )
+    print 'Saving the data in '+str(dataOutput)+' file ...'
+    f1 = open(dataOutput,'w')
+    pickle.dump([memx,memy],f1)
+    return "...Done!"
+
+def process_images_gabor_UnShuffled( stddev ):
+	classNames = open('classNames.txt','r')
+	list_classes = classNames
+	#print 'Beginning Gabor processing of images across', num_classes, 'classes...'
+	i = 0
+	image_data = []
+	for class_name in list_classes:
+		folderName = (class_name.split('\n'))[0]
+		class_path = folderName
+		list_images = os.listdir(class_path)
+		num_images = len(list_images)
+		print 'Beginning processing of', num_images, 'images in class', class_name, i
+		for image_name in list_images:
+			image = cv2.imread(class_path+'/'+image_name, 0)
+			if 'o' not in image_name:
+                            #rows, cols = image.shape
+                            #rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+                            #new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+                            try:
+                                    gabor_feature = gabor(image,stddev)
+                                    image_data.append((gabor_feature,i))
+                                    #gabor_feature = gabor(new_image,stddev)
+                                    #image_data.append((gabor_feature,i))
+                            except:
+                                    print 'Error in evaluating Gabor-filtered image for an image in class', class_name, i
+		i += 1
+	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+	x = []
+	y = []
+	for term in image_data:
+		x.append(term[0])
+		y.append(term[1])
+	print 'Writing data to file...'
+	data = open('img_gaborUnShuffled_data.pickle','w')
+	pickle.dump((np.array(x), np.array(y)), data)
+	data.close()
+	print 'Image Processing Done'
+
+def matrixMultDataAugmentation( dataSet1, dataSet2, outputDataSet ):
+    print 'Loading Dataset 1 ...' + str(dataSet1)
+    f1 = open(dataSet1,'r')
+    print 'Loading Dataset 2 ...' + str(dataSet2)
+    f2 = open(dataSet2,'r')
+    x1,y1 = pickle.load(f1)
+    x2,y2 = pickle.load(f2)
+    x1 = np.array(x1)
+    x2 = np.array(x2)
+    if shape(y1) != shape(y2):
+        return "List size Mismatch between DS1 and DS2"
+    sz = len(y1)
+    shp1 = shape(x1)
+    shp2 = shape(x2)
+    mem = []
+    print 'Starting Data Augmentation of shape ... ' + str(shp1) + ' , ' + str(shp2)
+    for i in range(0,sz):
+        if y1[i] != y2[i]:
+            return "List Annotation Mismatch between DS1 and DS2"
+        x3i = np.array([x1[i,:]]).T * np.array([x2[i,:]])
+        x3i = np.reshape(x3i,(shp1[1]*shp2[1],))
+        mem.append((x3i,y1[i]))
+    print 'Shuffling data of size ... ' + str(len(mem))
+    random.shuffle(mem)
+    memx = []
+    memy = []
+    for e in mem:
+        memx.append( e[0] )
+        memy.append( e[1] )
+    print 'Saving the data in '+str(outputDataSet)+' file ...'
+    f1 = open(outputDataSet,'w')
+    pickle.dump([memx,memy],f1)
+    return "...Done!"
+    
+
+#--------------------------------------------------------------------
+
 def show(image):
 	cv2.imshow('Image', image)
 	cv2.waitKey(0)
@@ -933,18 +1089,18 @@ def process_images_dct(path, size):
 
 #--------------------------------------------------------
 
-
 def randomForest(data, training_percent, numOfTrees ):
 	print 'Loading data from file...'
-	fd = open(image_data_file, 'r')
+	fd = open(data, 'r')
 	data = pickle.load(fd)
-	x_unproc, y = data
-	x = preprocessing.scale(x_unproc)
-	num_training = round(len(x)*training_percent)
-	x_train = x[:num_training]
-	x_test = x[num_training:]
-	y_train = y[:num_training]
-	y_test = y[num_training:]
+	x, y = (np.array(data[0]),np.array(data[1]))
+	sz = shape(x)
+	num_training = int(round(sz[0]*training_percent*1.0/100.0))
+	print sz
+	x_train = x[0:num_training,:]
+	x_test = x[num_training:sz[0],:]
+	y_train = y[0:num_training]
+	y_test = y[num_training:sz[0]]
 	print 'Training', len(x_train), 'data samples on RandomForest...'
 	clf = RandomForestClassifier(n_estimators=numOfTrees)
 	clff = clf.fit(x_train, y_train)
@@ -961,15 +1117,17 @@ def randomForest(data, training_percent, numOfTrees ):
 
 def svm(data, training_percent, C_value, gamma_value):
 	print 'Loading data from file...'
-	fd = open(image_data_file, 'r')
+	from sklearn import svm
+	fd = open(data, 'r')
 	data = pickle.load(fd)
-	x_unproc, y = data
-	x = preprocessing.scale(x_unproc)
-	num_training = round(len(x)*training_percent)
-	x_train = x[:num_training]
-	x_test = x[num_training:]
-	y_train = y[:num_training]
-	y_test = y[num_training:]
+	x, y = (np.array(data[0]),np.array(data[1]))
+	sz = shape(x)
+	num_training = int(round(sz[0]*training_percent*1.0/100.0))
+	print num_training
+	x_train = x[0:num_training,:]
+	x_test = x[num_training:sz[0],:]
+	y_train = y[0:num_training]
+	y_test = y[num_training:sz[0]]
 	print 'Training', len(x_train), 'data samples on SVM...'
 	classifier = svm.SVC(C=C_value, cache_size=1000, gamma=gamma_value, kernel='rbf', probability=True)
 	classifier.fit(x_train, y_train)
@@ -985,15 +1143,16 @@ def svm(data, training_percent, C_value, gamma_value):
 	
 def logReg(data, training_percent, C_value):
 	print 'Loading data from file...'
-	fd = open(image_data_file, 'r')
+	fd = open(data, 'r')
 	data = pickle.load(fd)
-	x_unproc, y = data
-	x = preprocessing.scale(x_unproc)
-	num_training = round(len(x)*training_percent)
-	x_train = x[:num_training]
-	x_test = x[num_training:]
-	y_train = y[:num_training]
-	y_test = y[num_training:]
+	x, y = (np.array(data[0]),np.array(data[1]))
+	sz = shape(x)
+	num_training = int(round(sz[0]*training_percent*1.0/100.0))
+	print num_training
+	x_train = x[0:num_training,:]
+	x_test = x[num_training:sz[0],:]
+	y_train = y[0:num_training]
+	y_test = y[num_training:sz[0]]
 	print 'Training', len(x_train), 'data samples on Logistic Regression Model...'
 	classifier = linear_model.LogisticRegression(C=C_value)
 	classifier.fit(x_train, y_train)
