@@ -5,10 +5,12 @@ import os
 from sklearn import svm
 from sklearn import preprocessing
 from sklearn import linear_model
+from sklearn import multiclass
 from random import shuffle
 from random import random
 from pprint import pprint
 import pickle
+import csv
 
 def show(image):
 	cv2.imshow('Image', image)
@@ -303,10 +305,6 @@ def lin_svm_analysis(image_data_file, training_percent, C_value):
 	print 'Training', len(x_train), 'data samples on Linear SVM...'
 	classifier = svm.LinearSVC(C=C_value)
 	classifier.fit(x_train, y_train)
-#	print 'Testing', len(x_test), 'data samples on Linear SVM...'
-#	y_predicted = classifier.predict(x_test)
-#	plt.plot(y_test, y_predicted, 'r*')
-#	plt.show()
 	print 'Calculating test score...'
 	score = classifier.score(x_test, y_test)
 	print 'Score on test data is', score
@@ -326,10 +324,6 @@ def log_reg_analysis(image_data_file, training_percent, C_value):
 	print 'Training', len(x_train), 'data samples on Logistic Regression Model...'
 	classifier = linear_model.LogisticRegression(C=C_value)
 	classifier.fit(x_train, y_train)
-#	print 'Testing', len(x_test), 'data samples on SVM...'
-#	y_predicted = classifier.predict(x_test)
-#	plt.plot(y_test, y_predicted, 'r*')
-#	plt.show()
 	print 'Calculating test score...'
 	score = classifier.score(x_test, y_test)
 	print 'Score on test data is', score
@@ -343,6 +337,124 @@ def num_images(path):
 		image_data += [len(os.listdir(class_path))]
 	return image_data
 
+def process_images_gabor(path, stddev):
+	list_classes = os.listdir(path)
+	num_classes = len(list_classes)
+	print 'Beginning Gabor processing of images across', num_classes, 'classes...'
+	i = 1
+	image_data = []
+	for class_name in list_classes:
+		class_path = path+'/'+class_name
+		list_images = os.listdir(class_path)
+		num_images = len(list_images)
+		print 'Beginning processing of', num_images, 'images in class', class_name, i
+		for image_name in list_images:
+			image = cv2.imread(class_path+'/'+image_name, 0)
+			rows, cols = image.shape
+			rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+			new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+			try:
+				gabor_feature = gabor(image,stddev)
+				image_data.append((gabor_feature,i))
+				gabor_feature = gabor(new_image,stddev)
+				image_data.append((gabor_feature,i))
+			except:
+				print 'Error in evaluating Gabor-filtered image for an image in class', class_name, i
+		i += 1
+	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+	shuffle(image_data)
+	x = []
+	y = []
+	for term in image_data:
+		x.append(term[0])
+		y.append(term[1])
+	print 'Writing data to file...'
+	data = open('img_gabor_data.pickle','w')
+	pickle.dump((np.array(x), np.array(y)), data)
+	data.close()
+	print 'Image Processing Done'
+
+def process_images_gabor_multilabel(path, stddev):
+	class_labels = []
+	class_names = []
+	with open(path+'/classes.txt') as tsv:
+		for line in csv.reader(tsv, delimiter='\t'):
+			curr_class_label = [int(line[0])]
+			class_names += [line[1]]
+			for i in range(2,len(line)):
+				curr_class_label += [int(line[i])]
+			class_labels += [curr_class_label]
+	print 'Beginning Gabor processing of images across', len(class_names), 'classes with multilabels...'
+	i = 0
+	image_data = []
+	for class_name in class_names:
+		class_path = path+'/'+class_name
+		list_images = os.listdir(class_path)
+		num_images = len(list_images)
+		print 'Beginning processing of', num_images, 'images in class', class_name, i
+		for image_name in list_images:
+			image = cv2.imread(class_path+'/'+image_name, 0)
+			rows, cols = image.shape
+			rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+			new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+			try:
+				gabor_feature = gabor(image,stddev)
+				image_data.append((gabor_feature,class_labels[i]))
+				gabor_feature = gabor(new_image,stddev)
+				image_data.append((gabor_feature,class_labels[i]))
+			except:
+				print 'Error in evaluating Gabor-filtered image for an image in class', class_name, i
+		i += 1
+	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+	shuffle(image_data)
+	x = []
+	y = []
+	for term in image_data:
+		x.append(term[0])
+		y.append(term[1])
+	print 'Writing data to file...'
+	data = open('img_gabor_multilabel_data.pickle','w')
+	pickle.dump((np.array(x), np.array(y)), data)
+	data.close()
+	print 'Image Processing Done'
+
+def multilabel_svm_analysis(image_data_file, training_percent, C_value, gamma_value):
+	print 'Loading data from file...'
+	fd = open(image_data_file, 'r')
+	data = pickle.load(fd)
+	x_unproc, y_unproc = data
+	x = preprocessing.scale(x_unproc)
+	binzr = preprocessing.MultiLabelBinarizer()
+	y = binzr.fit_transform(y_unproc)
+	num_training = round(len(x)*training_percent)
+	x_train = x[:num_training]
+	x_test = x[num_training:]
+	y_train = y[:num_training]
+	y_test = y[num_training:]
+	print 'Training', len(x_train), 'data samples on SVM...'
+	estimator = svm.SVC(C=C_value, cache_size=1000, gamma=gamma_value, kernel='rbf', probability=True)
+	classifier = multiclass.OneVsRestClassifier(estimator, n_jobs = -1)
+	classifier.fit(x_train, y_train)
+	print 'Calculating test probabilities...'
+	probs = classifier.predict_proba(x_test)
+	any_score = 0
+	all_score = 0
+	all_labels = binzr.inverse_transform(y_test)
+	print 'Calculating test scores...'
+	for i in range(len(probs)):
+		labels = sorted(all_labels[i])
+		top_k_classes = sorted(sorted(range(len(probs[i])), key=lambda j: probs[i][j])[-len(labels):])
+		top_k_classes = [k+1 for k in top_k_classes]
+		if (len(set(labels).intersection(top_k_classes))>0):
+			any_score += 1
+		if(cmp(labels,top_k_classes)==0):
+			all_score += 1
+		print (labels,top_k_classes)
+	any_score = float(any_score)/len(y_test)
+	all_score = float(all_score)/len(y_test)
+	print 'AnyClassMatches score on test data is', any_score, 'and AllClassesMatch score on test data is', all_score
+	print 'SVM Analysis Done'
+
 #process_images_gabor('/home/sahil/Documents/plankton/train',8)
 #svm_analysis('img_gabor_data.pickle',0.6,8,0.1)
 #process_images_hog('/home/sahil/Documents/plankton/train')
@@ -355,4 +467,5 @@ def num_images(path):
 #plt.plot(np.sort(x))
 #plt.show()
 #pprint((dct(cv2.imread('plankton.jpg',0),14)))
-
+process_images_gabor_multilabel('/home/sahil/Documents/minip_plankton/train',8)
+multilabel_svm_analysis('img_gabor_multilabel_data.pickle',0.6,8,0.1)
