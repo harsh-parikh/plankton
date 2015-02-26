@@ -1,6 +1,6 @@
 SIFT 16 -> SVM = 39.56%
 SIFT 64 -> SVM = 49.95%
 SIFT 128 -> SVM = 54.04%
-SIFT 128 -> RandomForest(10) = 77.13%
+SIFT 128 -> RandomForest(10) = 27.43%
 Gabor -> multilabel SVM (after including superclasses) = AnyClassMatchesScore: 0.812476822284, AllClassesMatchScore: 0.421484197948
 
