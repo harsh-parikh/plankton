@@ -455,6 +455,64 @@ def multilabel_svm_analysis(image_data_file, training_percent, C_value, gamma_va
 	print 'AnyClassMatches score on test data is', any_score, 'and AllClassesMatch score on test data is', all_score
 	print 'SVM Analysis Done'
 
+def find_legal_ground_truths(path):
+	legal = []
+	with open(path+'/classes.txt') as tsv:
+		for line in csv.reader(tsv, delimiter='\t'):
+			curr_truth = []
+			for i in range(2,len(line)):
+				curr_truth += [int(line[i])-1]	#'-1' because counting begins at 0
+			curr_truth += [int(line[0])-1]
+			legal.append(curr_truth)
+	return legal
+
+def hex_stochastic_gradient(f, y, legal_ground_truths): #LGTs must contain lists sorted in increasing order; remember that counting starts at 0
+	if y in legal_ground_truths:
+		#score = 0
+		#for i in y:
+		#	score += f[i]
+		#score = np.exp(score)
+		partition_func = 0
+		z_grads = [0 for i in range(len(f))]
+		for x in legal_ground_truths:
+			new_score = 0
+			for i in x:
+				new_score += f[i]
+			new_score = np.exp(new_score)
+			partition_func += new_score
+			for i in x:
+				z_grads[i] += new_score
+		#prob = float(score)/partition_func
+		gradient = [0 for i in range(len(f))]
+		for i in y:
+			gradient[i] = float(z_grads[i])/partition_func - 1
+		return gradient
+	else:
+		print 'Illegal ground truth value', y
+		return False
+
+def hex_predict_prob(f, legal_ground_truths): #LGTs must contain lists sorted in increasing order; remember that counting starts at 0
+	if y in legal_ground_truths:
+		partition_func = 0
+		z_grads = [0 for i in range(len(f))]
+		for x in legal_ground_truths:
+			new_score = 0
+			for i in x:
+				new_score += f[i]
+			new_score = np.exp(new_score)
+			partition_func += new_score
+			for i in x:
+				z_grads[i] += new_score
+		probs = [0 for i in range(len(f))]
+		for i in range(len(probs)):
+			probs[i] = float(z_grads[i])/partition_func
+		return probs
+	else:
+		print 'Illegal ground truth value', y
+		return False
+			
+	
+
 #process_images_gabor('/home/sahil/Documents/plankton/train',8)
 #svm_analysis('img_gabor_data.pickle',0.6,8,0.1)
 #process_images_hog('/home/sahil/Documents/plankton/train')
@@ -467,5 +525,12 @@ def multilabel_svm_analysis(image_data_file, training_percent, C_value, gamma_va
 #plt.plot(np.sort(x))
 #plt.show()
 #pprint((dct(cv2.imread('plankton.jpg',0),14)))
-process_images_gabor_multilabel('/home/sahil/Documents/minip_plankton/train',8)
-multilabel_svm_analysis('img_gabor_multilabel_data.pickle',0.6,8,0.1)
+#process_images_gabor_multilabel('/home/sahil/Documents/minip_plankton/train',8)
+#multilabel_svm_analysis('img_gabor_multilabel_data.pickle',0.6,8,0.1)
+
+lgt = [[0],[0,1],[0,2],[1,2],[0,1,2]]
+f = [1,2,2]
+y = [0,2]
+print hex_stochastic_gradient(f, y, lgt)
+print hex_predict_prob(f, lgt)
+#print find_legal_ground_truths('/home/sahil/Documents/minip_plankton/train')
