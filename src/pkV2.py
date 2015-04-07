@@ -53,7 +53,7 @@ def makeSmallerDS( name, size, data ):
     x, y = dataset
     x = np.array(x)
     xSmall = x[0:size,:]
-    ySmall = y[0:size]
+    ySmall = y[0:size,:]
     fS = open(name+'.pickle','w')
     pickle.dump([xSmall,ySmall],fS)
     fS.close()
@@ -140,12 +140,13 @@ def trainANN( data, eta, epsilon, iterations, m, n ):
     nEx = np.shape(xX)[0]
     layers = initANN( n, m )
     err = np.Inf
+    ea = []
     itr = 1
     while err >= epsilon and itr<=iterations:
         dO = 0;
         for i in range(0,nEx):
             ( x , y ) = (xX[i],yY[i])
-            x = np.resize(x,(16,))
+            x = np.resize(x,(44*44,))
             #x = (map(float,x)) / (np.linalg.norm(x))
             y1 = [ 0 for i in range(0,121)]
             y1[y] = 1
@@ -164,9 +165,10 @@ def trainANN( data, eta, epsilon, iterations, m, n ):
                     dell = backPropANN( y, o[n-j], j, dell, layers[n+1-j] )
             layers = updateLayersANN( layers, dell, o, x, eta/(np.sqrt(itr)) )
             dO = np.linalg.norm( np.subtract( y, o[n] ) ) + dO
-        err = dO/(n+1)
+        err = dO/(nEx)
+        ea.append(err)
         itr = itr + 1
-    a = ( layers, dell )
+    a = ( layers, dell, ea )
     return a
 
 def svmANN( data, layers ):
@@ -178,7 +180,7 @@ def svmANN( data, layers ):
     vecs = []
     for i in range(0,nEx):
         x  = xX[i]
-        x = np.resize(x,(16,))
+        x = np.resize(x,(44*44,))
         p = predictANN( layers, x )
         vecs.append(p)
     clf=svm.SVC(kernel='rbf', C=128)
@@ -194,7 +196,7 @@ def testSvmANN( data, layers, clff ):
     acc = 0
     for i in range(0,nEx):
         ( x , y ) = (xX[i],yY[i])
-        x = np.resize(x,(16,))
+        x = np.resize(x,(44*44,))
         x1 = predictANN( layers, x )
         p = clff.predict(x1)[0]
         if p == y:
@@ -221,7 +223,7 @@ def getScoreANN( layers, data, outputFeatures ):
     confMat = np.zeros([121,121])
     for i in range(0,nEx):
         ( x , y ) = (xX[i],yY[i])
-        x = np.resize(x,(16,))
+        x = np.resize(x,(44*44,))
         y1 = [ 0 for i in range(0,121)]
         y1[y] = 1
         y = y1
@@ -531,13 +533,17 @@ def evaluate(learning_rate=0.1, n_epochs=1,
 #-----------------------------------------------------------------------------------------------------------
 
 def siftFV(imgName, folder='..'):
-    img = cv2.imread(folder+'/'+imgName)
-    gray= cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    img1 = cv2.imread(folder+'/'+imgName)
+    img1 = cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
+    rows, cols  = img1.shape
+    rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+    img2 = cv2.warpAffine(img1,rotmat,(cols,rows))
     sift = cv2.SIFT()
-    kp = sift.detect(gray,None)
+    kp1 = sift.detect(img1,None)
+    kp2 = sift.detect(img2,None)
     #img=cv2.drawKeypoints(gray,kp)
     #cv2.imwrite(folder+'/'+'sift_'+imgName,img)
-    return kp
+    return kp1, kp2
 
 def processImgsToSift():
     classNames = open('classNames.txt','r')
@@ -551,9 +557,14 @@ def processImgsToSift():
         imgNames = [ f for f in os.listdir(folderName) ]
         for img in imgNames:
             if 'o' not in img:
-                kp = siftFV(img,folderName)
+                kp1, kp2 = siftFV(img,folderName)
                 imgKP = []
-                for v in kp:
+                for v in kp1:
+                    w = [ v.pt, v.size ]
+                    imgKP.append(w)
+                mem.append( (imgKP,y) )
+                imgKP = []
+                for v in kp2:
                     w = [ v.pt, v.size ]
                     imgKP.append(w)
                 mem.append( (imgKP,y) )
@@ -756,20 +767,20 @@ def processImgPostSift_UnShuffled( bow, dataInput, dataOutput ):
     return "...Done!"
 
 def process_images_gabor_UnShuffled( stddev ):
-	classNames = open('classNames.txt','r')
-	list_classes = classNames
-	#print 'Beginning Gabor processing of images across', num_classes, 'classes...'
-	i = 0
-	image_data = []
-	for class_name in list_classes:
-		folderName = (class_name.split('\n'))[0]
-		class_path = folderName
-		list_images = os.listdir(class_path)
-		num_images = len(list_images)
-		print 'Beginning processing of', num_images, 'images in class', class_name, i
-		for image_name in list_images:
-			image = cv2.imread(class_path+'/'+image_name, 0)
-			if 'o' not in image_name:
+     classNames = open('classNames.txt','r')
+     list_classes = classNames
+     #print 'Beginning Gabor processing of images across', num_classes, 'classes...'
+     i = 0
+     image_data = []
+     for class_name in list_classes:
+          folderName = (class_name.split('\n'))[0]
+          class_path = folderName
+          list_images = os.listdir(class_path)
+          num_images = len(list_images)
+          print 'Beginning processing of', num_images, 'images in class', class_name, i
+          for image_name in list_images:
+               image = cv2.imread(class_path+'/'+image_name, 0)
+               if 'o' not in image_name:
                             #rows, cols = image.shape
                             #rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
                             #new_image = cv2.warpAffine(image,rotmat,(cols,rows))
@@ -780,18 +791,18 @@ def process_images_gabor_UnShuffled( stddev ):
                                     #image_data.append((gabor_feature,i))
                             except:
                                     print 'Error in evaluating Gabor-filtered image for an image in class', class_name, i
-		i += 1
-	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
-	x = []
-	y = []
-	for term in image_data:
-		x.append(term[0])
-		y.append(term[1])
-	print 'Writing data to file...'
-	data = open('img_gaborUnShuffled_data.pickle','w')
-	pickle.dump((np.array(x), np.array(y)), data)
-	data.close()
-	print 'Image Processing Done'
+          i += 1
+     print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+     x = []
+     y = []
+     for term in image_data:
+          x.append(term[0])
+          y.append(term[1])
+     print 'Writing data to file...'
+     data = open('img_gaborUnShuffled_data.pickle','w')
+     pickle.dump((np.array(x), np.array(y)), data)
+     data.close()
+     print 'Image Processing Done'
 
 def matrixMultDataAugmentation( dataSet1, dataSet2, outputDataSet ):
     print 'Loading Dataset 1 ...' + str(dataSet1)
@@ -831,96 +842,96 @@ def matrixMultDataAugmentation( dataSet1, dataSet2, outputDataSet ):
 #--------------------------------------------------------------------
 
 def show(image):
-	cv2.imshow('Image', image)
-	cv2.waitKey(0)
-	cv2.destroyAllWindows()
+     cv2.imshow('Image', image)
+     cv2.waitKey(0)
+     cv2.destroyAllWindows()
 
 def threshold(image, thresh):
-	return cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY)[1]
+     return cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY)[1]
 
 def neg_threshold(image, thresh):
-	return cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY_INV)[1]
+     return cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY_INV)[1]
 
 def area(image):
-	(height, width) = image.shape
-	ar = height*width
-	for i in range(height):
-		for j in range(width):
-			if (image[i][j] != 0):
-				ar -= 1
-	return ar
+     (height, width) = image.shape
+     ar = height*width
+     for i in range(height):
+          for j in range(width):
+               if (image[i][j] != 0):
+                    ar -= 1
+     return ar
 
 def perimeter(image):
-	new_image = cv2.Canny(image, 100, 200)
-	peri = 0
-	(height, width) = new_image.shape
-	for i in range(height):
-		for j in range(width):
-			if (new_image[i][j] != 0):
-				peri += 1
-	return peri
+     new_image = cv2.Canny(image, 100, 200)
+     peri = 0
+     (height, width) = new_image.shape
+     for i in range(height):
+          for j in range(width):
+               if (new_image[i][j] != 0):
+                    peri += 1
+     return peri
 
 def circularity(path):
-	list_imgs = os.listdir(path)
-	num = len(list_imgs)
-	print 'Finding circularity constants for', num, 'images...'
-	circu = [0 for i in range(num)]
-	i = 0
-	for img in list_imgs:
-		image = threshold(cv2.imread(path+'/'+img, 0), 230)
-		ar = area(image)
-		peri = perimeter(image)
-		circu[i] = (peri*peri)/(4.0*np.pi*ar)
-		i += 1
-	return circu
+     list_imgs = os.listdir(path)
+     num = len(list_imgs)
+     print 'Finding circularity constants for', num, 'images...'
+     circu = [0 for i in range(num)]
+     i = 0
+     for img in list_imgs:
+          image = threshold(cv2.imread(path+'/'+img, 0), 230)
+          ar = area(image)
+          peri = perimeter(image)
+          circu[i] = (peri*peri)/(4.0*np.pi*ar)
+          i += 1
+     return circu
 
 def low_pass_filter(signal):
-	y = np.fft.fft(signal)
-	x = [y[i] for i in range(10)] + [0]*(len(y)-10)
-	y = np.fft.ifft(x)
-	return y
+     y = np.fft.fft(signal)
+     x = [y[i] for i in range(10)] + [0]*(len(y)-10)
+     y = np.fft.ifft(x)
+     return y
 
 def frequency(signal):
-	return abs(np.fft.fft(signal))
+     return abs(np.fft.fft(signal))
 
 def hu_moments(image, thresh):
-	new_image = cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY_INV)[1]
-	return cv2.HuMoments(cv2.moments(new_image)).flatten()
+     new_image = cv2.threshold(image, thresh, 255, cv2.THRESH_BINARY_INV)[1]
+     return cv2.HuMoments(cv2.moments(new_image)).flatten()
 
 def hog(image):
-	gx = cv2.Sobel(image, cv2.CV_32F, 1, 0)
-	gy = cv2.Sobel(image, cv2.CV_32F, 0, 1)
-	(mag, ang) = cv2.cartToPolar(gx, gy)
-	bins = np.int32(16*ang/(2*np.pi))
-	bin_cells = bins[:10,:10], bins[10:,:10], bins[:10,10:], bins[10:,10:]
-	mag_cells = mag[:10,:10], mag[10:,:10], mag[:10,10:], mag[10:,10:]
-	hists = [np.bincount(b.ravel(), m.ravel(), 16) for b, m in zip(bin_cells, mag_cells)]
-	hist = np.hstack(hists)
-	return hist
+     gx = cv2.Sobel(image, cv2.CV_32F, 1, 0)
+     gy = cv2.Sobel(image, cv2.CV_32F, 0, 1)
+     (mag, ang) = cv2.cartToPolar(gx, gy)
+     bins = np.int32(16*ang/(2*np.pi))
+     bin_cells = bins[:10,:10], bins[10:,:10], bins[:10,10:], bins[10:,10:]
+     mag_cells = mag[:10,:10], mag[10:,:10], mag[:10,10:], mag[10:,10:]
+     hists = [np.bincount(b.ravel(), m.ravel(), 16) for b, m in zip(bin_cells, mag_cells)]
+     hist = np.hstack(hists)
+     return hist
 
 def gabor(image, stddev):
-	thetas = [0,30,60,90,120,150,180]
-	lambdas = [1,2,4,8,16]
-	feature_vector = []
-	for i in lambdas:
-		for j in thetas:
-			gabmat = cv2.getGaborKernel((5,5),stddev,j,i,1)
-			new_image = cv2.filter2D(image,-1,gabmat)
-			feature_vector += [np.mean(new_image), np.std(new_image)]
-	return feature_vector
+     thetas = [0,30,60,90,120,150,180]
+     lambdas = [1,2,4,8,16]
+     feature_vector = []
+     for i in lambdas:
+          for j in thetas:
+               gabmat = cv2.getGaborKernel((5,5),stddev,j,i,1)
+               new_image = cv2.filter2D(image,-1,gabmat)
+               feature_vector += [np.mean(new_image), np.std(new_image)]
+     return feature_vector
 
 def dct(image, size):
-	new_image = np.float32(image)/255.0 
-	new_image = cv2.dct(cv2.resize(new_image,(64,64)))
-	vect = []
-	j = 0
-	while (j<=size):
-		k = 0
-		while (k<=j):
-			vect += [new_image[k][j-k]]
-			k += 1
-		j += 1
-	return vect
+     new_image = np.float32(image)/255.0 
+     new_image = cv2.dct(cv2.resize(new_image,(64,64)))
+     vect = []
+     j = 0
+     while (j<=size):
+          k = 0
+          while (k<=j):
+               vect += [new_image[k][j-k]]
+               k += 1
+          j += 1
+     return vect
 
 #h1 = hu_moments('/home/sahil/Documents/plankton/train/chaetognath_non_sagitta', 5)
 #h2 = hu_moments('/home/sahil/Documents/plankton/train/chaetognath_sagitta', 5)
@@ -939,238 +950,474 @@ def dct(image, size):
 #classifier.predict(x)
 
 def process_images_hog(path):
-	list_classes = os.listdir(path)
-	num_classes = len(list_classes)
-	print 'Beginning HOG processing of images across', num_classes, 'classes...'
-	i = 1
-	image_data = []
-	for class_name in list_classes:
-		class_path = path+'/'+class_name
-		list_images = os.listdir(class_path)
-		num_images = len(list_images)
-		print 'Beginning processing of', num_images, 'images in class', class_name, i
-		for image_name in list_images:
-			image = cv2.imread(class_path+'/'+image_name, 0)
-			rows, cols = image.shape
-			rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
-			new_image = cv2.warpAffine(image,rotmat,(cols,rows))
-			try:
-				hog_hist = hog(image)
-				image_data.append((hog_hist,i))
-				hog_hist = hog(new_image)
-				image_data.append((hog_hist,i))
-			except:
-				print 'Error in evaluating HOG descriptors for an image in class', class_name, i
-		i += 1
-	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
-	shuffle(image_data)
-	x = []
-	y = []
-	for term in image_data:
-		x.append(term[0])
-		y.append(term[1])
-	print 'Writing data to file...'
-	data = open('img_hog_data.pickle','w')
-	pickle.dump((np.array(x), np.array(y)), data)
-	data.close()
-	print 'Image Processing Done'
+     list_classes = os.listdir(path)
+     num_classes = len(list_classes)
+     print 'Beginning HOG processing of images across', num_classes, 'classes...'
+     i = 1
+     image_data = []
+     for class_name in list_classes:
+          class_path = path+'/'+class_name
+          list_images = os.listdir(class_path)
+          num_images = len(list_images)
+          print 'Beginning processing of', num_images, 'images in class', class_name, i
+          for image_name in list_images:
+               image = cv2.imread(class_path+'/'+image_name, 0)
+               rows, cols = image.shape
+               rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+               new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+               try:
+                    hog_hist = hog(image)
+                    image_data.append((hog_hist,i))
+                    hog_hist = hog(new_image)
+                    image_data.append((hog_hist,i))
+               except:
+                    print 'Error in evaluating HOG descriptors for an image in class', class_name, i
+          i += 1
+     print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+     shuffle(image_data)
+     x = []
+     y = []
+     for term in image_data:
+          x.append(term[0])
+          y.append(term[1])
+     print 'Writing data to file...'
+     data = open('img_hog_data.pickle','w')
+     pickle.dump((np.array(x), np.array(y)), data)
+     data.close()
+     print 'Image Processing Done'
 
 def process_images_gabor( stddev ):
-	classNames = open('classNames.txt','r')
-	list_classes = classNames
-	#print 'Beginning Gabor processing of images across', num_classes, 'classes...'
-	i = 0
-	image_data = []
-	for class_name in list_classes:
-		folderName = (class_name.split('\n'))[0]
-		class_path = folderName
-		list_images = os.listdir(class_path)
-		num_images = len(list_images)
-		print 'Beginning processing of', num_images, 'images in class', class_name, i
-		for image_name in list_images:
-			image = cv2.imread(class_path+'/'+image_name, 0)
-			rows, cols = image.shape
-			rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
-			new_image = cv2.warpAffine(image,rotmat,(cols,rows))
-			try:
-				gabor_feature = gabor(image,stddev)
-				image_data.append((gabor_feature,i))
-				gabor_feature = gabor(new_image,stddev)
-				image_data.append((gabor_feature,i))
-			except:
-				print 'Error in evaluating Gabor-filtered image for an image in class', class_name, i
-		i += 1
-	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
-	shuffle(image_data)
-	x = []
-	y = []
-	for term in image_data:
-		x.append(term[0])
-		y.append(term[1])
-	print 'Writing data to file...'
-	data = open('img_gabor_data.pickle','w')
-	pickle.dump((np.array(x), np.array(y)), data)
-	data.close()
-	print 'Image Processing Done'
+     classNames = open('classNames.txt','r')
+     list_classes = classNames
+     #print 'Beginning Gabor processing of images across', num_classes, 'classes...'
+     i = 0
+     image_data = []
+     for class_name in list_classes:
+          folderName = (class_name.split('\n'))[0]
+          class_path = folderName
+          list_images = os.listdir(class_path)
+          num_images = len(list_images)
+          print 'Beginning processing of', num_images, 'images in class', class_name, i
+          for image_name in list_images:
+               image = cv2.imread(class_path+'/'+image_name, 0)
+               rows, cols = image.shape
+               rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+               new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+               try:
+                    gabor_feature = gabor(image,stddev)
+                    image_data.append((gabor_feature,i))
+                    gabor_feature = gabor(new_image,stddev)
+                    image_data.append((gabor_feature,i))
+               except:
+                    print 'Error in evaluating Gabor-filtered image for an image in class', class_name, i
+          i += 1
+     print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+     shuffle(image_data)
+     x = []
+     y = []
+     for term in image_data:
+          x.append(term[0])
+          y.append(term[1])
+     print 'Writing data to file...'
+     data = open('img_gabor_data.pickle','w')
+     pickle.dump((np.array(x), np.array(y)), data)
+     data.close()
+     print 'Image Processing Done'
 
 def process_images_hu(path, thresh):
-	list_classes = os.listdir(path)
-	num_classes = len(list_classes)
-	print 'Beginning Hu Moments processing of images across', num_classes, 'classes...'
-	i = 1
-	image_data = []
-	for class_name in list_classes:
-		class_path = path+'/'+class_name
-		list_images = os.listdir(class_path)
-		num_images = len(list_images)
-		print 'Beginning processing of', num_images, 'images in class', class_name, i
-		for image_name in list_images:
-			image = cv2.imread(class_path+'/'+image_name, 0)
-			rows, cols = image.shape
-			rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
-			new_image = cv2.warpAffine(image,rotmat,(cols,rows))
-			try:
-				hu = hu_moments(image, thresh)
-				image_data.append((hu,i))
-				hu = hu_moments(new_image, thresh)
-				image_data.append((hu,i))
-			except:
-				print 'Error in evaluating Hu Moments for an image in class', class_name, i
-		i += 1
-	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
-	shuffle(image_data)
-	x = []
-	y = []
-	for term in image_data:
-		x.append(term[0])
-		y.append(term[1])
-	print 'Writing data to file...'
-	data = open('img_hu_data.pickle','w')
-	pickle.dump((np.array(x), np.array(y)), data)
-	data.close()
-	print 'Image Processing Done'
+     list_classes = os.listdir(path)
+     num_classes = len(list_classes)
+     print 'Beginning Hu Moments processing of images across', num_classes, 'classes...'
+     i = 1
+     image_data = []
+     for class_name in list_classes:
+          class_path = path+'/'+class_name
+          list_images = os.listdir(class_path)
+          num_images = len(list_images)
+          print 'Beginning processing of', num_images, 'images in class', class_name, i
+          for image_name in list_images:
+               image = cv2.imread(class_path+'/'+image_name, 0)
+               rows, cols = image.shape
+               rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+               new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+               try:
+                    hu = hu_moments(image, thresh)
+                    image_data.append((hu,i))
+                    hu = hu_moments(new_image, thresh)
+                    image_data.append((hu,i))
+               except:
+                    print 'Error in evaluating Hu Moments for an image in class', class_name, i
+          i += 1
+     print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+     shuffle(image_data)
+     x = []
+     y = []
+     for term in image_data:
+          x.append(term[0])
+          y.append(term[1])
+     print 'Writing data to file...'
+     data = open('img_hu_data.pickle','w')
+     pickle.dump((np.array(x), np.array(y)), data)
+     data.close()
+     print 'Image Processing Done'
 
 def process_images_dct(path, size):
-	list_classes = os.listdir(path)
-	num_classes = len(list_classes)
-	print 'Beginning DCT processing of images across', num_classes, 'classes...'
-	i = 1
-	image_data = []
-	for class_name in list_classes:
-		class_path = path+'/'+class_name
-		list_images = os.listdir(class_path)
-		num_images = len(list_images)
-		print 'Beginning processing of', num_images, 'images in class', class_name, i
-		for image_name in list_images:
-			image = cv2.imread(class_path+'/'+image_name, 0)
-			rows, cols = image.shape
-			rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
-			new_image = cv2.warpAffine(image,rotmat,(cols,rows))
-			try:
-				dct_feature = dct(image,size)
-				image_data.append((dct_feature,i))
-				dct_feature = dct(new_image,size)
-				image_data.append((dct_feature,i))
-			except:
-				print 'Error in evaluating DCT-filtered image for an image in class', class_name, i
-		i += 1
-	print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
-	shuffle(image_data)
-	x = []
-	y = []
-	for term in image_data:
-		x.append(term[0])
-		y.append(term[1])
-	print 'Writing data to file...'
-	data = open('img_dct_data.pickle','w')
-	pickle.dump((np.array(x), np.array(y)), data)
-	data.close()
-	print 'Image Processing Done'
+     list_classes = os.listdir(path)
+     num_classes = len(list_classes)
+     print 'Beginning DCT processing of images across', num_classes, 'classes...'
+     i = 1
+     image_data = []
+     for class_name in list_classes:
+          class_path = path+'/'+class_name
+          list_images = os.listdir(class_path)
+          num_images = len(list_images)
+          print 'Beginning processing of', num_images, 'images in class', class_name, i
+          for image_name in list_images:
+               image = cv2.imread(class_path+'/'+image_name, 0)
+               rows, cols = image.shape
+               rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+               new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+               try:
+                    dct_feature = dct(image,size)
+                    image_data.append((dct_feature,i))
+                    dct_feature = dct(new_image,size)
+                    image_data.append((dct_feature,i))
+               except:
+                    print 'Error in evaluating DCT-filtered image for an image in class', class_name, i
+          i += 1
+     print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+     shuffle(image_data)
+     x = []
+     y = []
+     for term in image_data:
+          x.append(term[0])
+          y.append(term[1])
+     print 'Writing data to file...'
+     data = open('img_dct_data.pickle','w')
+     pickle.dump((np.array(x), np.array(y)), data)
+     data.close()
+     print 'Image Processing Done'
 
 #--------------------------------------------------------
 
 def randomForest(data, training_percent, numOfTrees ):
-	print 'Loading data from file...'
-	fd = open(data, 'r')
-	data = pickle.load(fd)
-	x, y = (np.array(data[0]),np.array(data[1]))
-	sz = shape(x)
-	num_training = int(round(sz[0]*training_percent*1.0/100.0))
-	print sz
-	x_train = x[0:num_training,:]
-	x_test = x[num_training:sz[0],:]
-	y_train = y[0:num_training]
-	y_test = y[num_training:sz[0]]
-	print 'Training', len(x_train), 'data samples on RandomForest...'
-	clf = RandomForestClassifier(n_estimators=numOfTrees)
-	clff = clf.fit(x_train, y_train)
-#	print 'Testing', len(x_test), 'data samples on SVM...'
-#	y_predicted = classifier.predict(x_test)
-#	plt.plot(y_test, y_predicted, 'r*')
-#	plt.show()
-	print 'Calculating validation accuracy...'
-	score = clff.score(x_test, y_test)
-	print 'Accuracy on validation data is', score
-	print 'RandomForest Analysis Done'
-	return clff
+     print 'Loading data from file...'
+     fd = open(data, 'r')
+     data = pickle.load(fd)
+     x, y = (np.array(data[0]),np.array(data[1]))
+     sz = shape(x)
+     num_training = int(round(sz[0]*training_percent*1.0/100.0))
+     print sz
+     x_train = x[0:num_training,:]
+     x_test = x[num_training:sz[0],:]
+     y_train = y[0:num_training]
+     y_test = y[num_training:sz[0]]
+     print 'Training', len(x_train), 'data samples on RandomForest...'
+     clf = RandomForestClassifier(n_estimators=numOfTrees, min_samples_split=2)
+     clff = clf.fit(x_train, y_train)
+#    print 'Testing', len(x_test), 'data samples on SVM...'
+#    y_predicted = classifier.predict(x_test)
+#    plt.plot(y_test, y_predicted, 'r*')
+#    plt.show()
+     print 'Calculating validation accuracy...'
+     score = clff.score(x_test, y_test)
+     print 'Accuracy on validation data is', score
+     print 'RandomForest Analysis Done'
+     return clff
 
 
 def svm(data, training_percent, C_value, gamma_value):
-	print 'Loading data from file...'
-	from sklearn import svm
-	fd = open(data, 'r')
-	data = pickle.load(fd)
-	x, y = (np.array(data[0]),np.array(data[1]))
-	sz = shape(x)
-	num_training = int(round(sz[0]*training_percent*1.0/100.0))
-	print num_training
-	x_train = x[0:num_training,:]
-	x_test = x[num_training:sz[0],:]
-	y_train = y[0:num_training]
-	y_test = y[num_training:sz[0]]
-	print 'Training', len(x_train), 'data samples on SVM...'
-	classifier = svm.SVC(C=C_value, cache_size=1000, gamma=gamma_value, kernel='rbf', probability=True)
-	classifier.fit(x_train, y_train)
-#	print 'Testing', len(x_test), 'data samples on SVM...'
-#	y_predicted = classifier.predict(x_test)
-#	plt.plot(y_test, y_predicted, 'r*')
-#	plt.show()
-	print 'Calculating test score...'
-	score = classifier.score(x_test, y_test)
-	print 'Score on test data is', score
-	print 'SVM Analysis Done'
-	return classifier
-	
+     print 'Loading data from file...'
+     from sklearn import svm
+     fd = open(data, 'r')
+     data = pickle.load(fd)
+     x, y = (np.array(data[0]),np.array(data[1]))
+     sz = shape(x)
+     num_training = int(round(sz[0]*training_percent*1.0/100.0))
+     print num_training
+     x_train = x[0:num_training,:]
+     x_test = x[num_training:sz[0],:]
+     y_train = y[0:num_training]
+     y_test = y[num_training:sz[0]]
+     print 'Training', len(x_train), 'data samples on SVM...'
+     classifier = svm.SVC(C=C_value, cache_size=1000, gamma=gamma_value, kernel='rbf', probability=True)
+     classifier.fit(x_train, y_train)
+#    print 'Testing', len(x_test), 'data samples on SVM...'
+#    y_predicted = classifier.predict(x_test)
+#    plt.plot(y_test, y_predicted, 'r*')
+#    plt.show()
+     print 'Calculating test score...'
+     score = classifier.score(x_test, y_test)
+     print 'Score on test data is', score
+     print 'SVM Analysis Done'
+     return classifier
+     
 def logReg(data, training_percent, C_value):
-	print 'Loading data from file...'
-	fd = open(data, 'r')
-	data = pickle.load(fd)
-	x, y = (np.array(data[0]),np.array(data[1]))
-	sz = shape(x)
-	num_training = int(round(sz[0]*training_percent*1.0/100.0))
-	print num_training
-	x_train = x[0:num_training,:]
-	x_test = x[num_training:sz[0],:]
-	y_train = y[0:num_training]
-	y_test = y[num_training:sz[0]]
-	print 'Training', len(x_train), 'data samples on Logistic Regression Model...'
-	classifier = linear_model.LogisticRegression(C=C_value)
-	classifier.fit(x_train, y_train)
-#	print 'Testing', len(x_test), 'data samples on SVM...'
-#	y_predicted = classifier.predict(x_test)
-#	plt.plot(y_test, y_predicted, 'r*')
-#	plt.show()
-	print 'Calculating test score...'
-	score = classifier.score(x_test, y_test)
-	print 'Score on test data is', score
-	print 'Logistic Regression Analysis Done'
-	return classifier
+     print 'Loading data from file...'
+     fd = open(data, 'r')
+     data = pickle.load(fd)
+     x, y = (np.array(data[0]),np.array(data[1]))
+     sz = shape(x)
+     num_training = int(round(sz[0]*training_percent*1.0/100.0))
+     print num_training
+     x_train = x[0:num_training,:]
+     x_test = x[num_training:sz[0],:]
+     y_train = y[0:num_training]
+     y_test = y[num_training:sz[0]]
+     print 'Training', len(x_train), 'data samples on Logistic Regression Model...'
+     classifier = linear_model.LogisticRegression(C=C_value)
+     classifier.fit(x_train, y_train)
+#    print 'Testing', len(x_test), 'data samples on SVM...'
+#    y_predicted = classifier.predict(x_test)
+#    plt.plot(y_test, y_predicted, 'r*')
+#    plt.show()
+     print 'Calculating test score...'
+     score = classifier.score(x_test, y_test)
+     print 'Score on test data is', score
+     print 'Logistic Regression Analysis Done'
+     return classifier
+
+def svmRandomForestEnsemble( data, training_percent, C_value, gamma_value, numOfTrees ):
+    print 'Loading data from file...'
+    from sklearn import svm
+    fd = open(data, 'r')
+    data = pickle.load(fd)
+    x, y = (np.array(data[0]),np.array(data[1]))
+    sz = shape(x)
+    num_training = int(round(sz[0]*training_percent*1.0/100.0))
+    print num_training
+    x_train = x[0:num_training,:]
+    x_test = x[num_training:sz[0],:]
+    y_train = y[0:num_training]
+    y_test = y[num_training:sz[0]]
+    clf1 = svm.SVC(C=C_value, cache_size=1000, gamma=gamma_value, kernel='rbf', probability=True)
+    clf2 = RandomForestClassifier(n_estimators=numOfTrees)
+    clff1 = clf1.fit(x_train, y_train)
+    clff2 = clf2.fit(x_train, y_train)
+    pred1 = clff1.predict_proba(x_test)
+    pred2 = clf1.predict_proba(x_test)
+    pred = pred1*pred2
+    pred_log = np.log(pred)
+    accuracy = 0
+    logLoss = 0
+    for i in range(0,len(y_test)):
+        y_val = y_test[i]
+        logLoss = logLoss - pred[i,y_val]
+        if y_val == np.argmax(pred[i,:]):
+            accuracy += 1
+    accuracy = float(accuracy)/float(len(y_test))
+    logLoss = float(logLoss)/float(len(y_test))
+    print 'LogLoss: '+str(logLoss)+' Accuracy: '+str(accuracy)
+    return clff1,clff2
 
 def num_images(path):
-	list_classes = os.listdir(path)
-	image_data = []
-	for class_name in list_classes:
-		class_path = path+'/'+class_name
-		image_data += [len(os.listdir(class_path))]
-	return image_data
+     list_classes = os.listdir(path)
+     image_data = []
+     for class_name in list_classes:
+          class_path = path+'/'+class_name
+          image_data += [len(os.listdir(class_path))]
+     return image_data
 
+def parseTree( filename ):
+    f = open( filename, 'r' )
+    tree = {}
+    depth = 0
+    for line in f:
+        line = (line.split('\n'))[0]
+        line = line.split('\t')
+        print line
+        index = line[1]
+        tree[index] = ( int(line[0]), map( int, line[2:len(line)] ) )
+        depth = max(depth,(len(line)-1))
+    return (tree, depth)
+
+def processDataHSC( treeInfo, feature='gabor' ):
+    tree, depth = treeInfo
+    #currrently we are only using GABOR features because it is giving best performance.
+    #We will later add options for SIFT, RAW and Other Features.
+    classNames = open('classNames.txt','r')
+    list_classes = classNames
+    #print 'Beginning Gabor processing of images across', num_classes, 'classes...'
+    i = 0
+    image_data = []
+    for class_name in list_classes:
+        class_name = (class_name.split('\n'))[0]
+        folderName = (class_name.split('\n'))[0]
+        class_path = folderName
+        list_images = os.listdir(class_path)
+        num_images = len(list_images)
+        classData = tree.get(class_name)
+        if not classData:
+            print class_name
+        treePath = (classData)[1]
+        treeLeaf = (classData)[0]
+        print 'Beginning processing of', num_images, 'images in class', class_name, treeLeaf, treePath
+        for image_name in list_images:
+           image = cv2.imread(class_path+'/'+image_name, 0)
+           rows, cols = image.shape
+           rotmat = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+           new_image = cv2.warpAffine(image,rotmat,(cols,rows))
+           yi = np.zeros( (depth+1,) )
+           yi[len(treePath)] = treeLeaf #last node is the leaf node and tells the final class
+           for nodeDepth in range(0,len(treePath)):
+                if treePath[nodeDepth] == -1:
+                   yi[0] = len(treePath) #first node of the path tells me about the length of the path
+                else:
+                    yi[nodeDepth+1] = treePath[nodeDepth] #adding the node in the path
+           gabor_feature = gabor(image,8)
+           image_data.append((gabor_feature,yi)) #putting the image data and annotation in the basket 
+           gabor_feature = gabor(new_image,8)
+           image_data.append((gabor_feature,yi)) #putting the augmented image data and annotation in the basket       
+        i += 1
+    print 'Processing finished. Shuffling image data worth', len(image_data), 'tuples...'
+    shuffle(image_data) #shuffling the basket
+    x = []
+    y = []
+    for term in image_data:
+         x.append(term[0])
+         y.append(term[1])
+    print 'Writing data to file...'
+    data = open('dataHSCgabor.pickle','w')
+    pickle.dump((np.array(x), np.array(y)), data)
+    data.close()
+    print 'Image Processing Done'
+
+def printModel( models ):
+    if models:
+        for a in models:
+            print '( '+str((models[a])[2])
+            printModel( (models[a])[1] )
+            print ' )'
+    else:
+        print '-'
+
+def inferTree( y ):
+    from sklearn import svm
+    shp = np.shape(y)
+    clf = svm.SVC( C=128, kernel = 'rbf', probability = True )
+    models = {}
+    models[0] = [clf,{},0]
+    for j in range(0,shp[0]):
+        for i in range(1,shp[1]):
+            if y[j,i] == 0:
+                i = i - 1
+                break
+        current_model = models[0]
+        current_model[2] += 1
+        for k in range(1,i):
+            if y[j,k] in current_model[1]:
+                current_model = current_model[1][ y[j,k] ]
+            else:
+                clf = svm.SVC( C=128, kernel = 'rbf', probability = True )
+                current_model[1][ y[j,k] ] = [clf,{},0]
+                current_model = current_model[1][ y[j,k] ]
+            current_model[2] += 1
+        if y[j,i] not in current_model[1]:
+            clf = svm.SVC( C=128, kernel = 'rbf', probability = True )
+            current_model[1][ y[j,i] ] = [clf, {},1]
+        else:
+            current_model[1][ y[j,i] ][2] +=1
+    #printModel( models )        
+    return models
+'''
+def trainHSC( x, y, models ):
+    from sklearn import svm
+    shp = np.shape(y)
+    shp_x = np.shape(x)
+    for j in range(0,shp[0]):
+        xX = np.reshape(x[j,:],(1,shp_x[1]))
+        yY = np.reshape(y[j,:],(shp[1],))
+        for i in range(1,shp[1]):
+            if y[j,i] == 0:
+                i = i - 1
+                break
+        current_model = models[0]
+        current_model[0] = current_model[0].fit( xX, [yY[1]] )
+        for k in range(2,i+1):
+            current_model = current_model[1][ yY[k-1] ]
+            current_model[0] = current_model[0].fit( xX, [yY[k]] )
+    return models
+'''
+
+def trainHSChelper( x, y, model ):
+    log = open('log')
+    if not (model[1].keys()):
+        print >>log, "No child"
+        return model
+    print >>log, model[1].keys()
+    from sklearn import svm
+    shp = np.shape(y)
+    shp_x = np.shape(x)
+    yval = []
+    for i in range(0,shp[0]):
+        yval.append(y[i,0])
+    print >>log, "Floor: ",shp[1]
+    model[0] = model[0].fit(x,yval)
+    a = {}
+    for j in range(0,shp[0]):
+        if y[j,0] in a:
+            (a[y[j,0]][0]).append(x[j,:])
+            (a[y[j,0]][1]).append(y[j,1:shp[1]])
+        else:
+            a[y[j,0]] = [[x[j,:]],[y[j,1:shp[1]]]]
+    if model[1]:
+        for v in model[1]:
+            print >>log, v
+            try:
+                model[1][v] = trainHSChelper( np.array(a[v][0]),np.array(a[v][1]), model[1][v])
+            except:
+                print >>log, "**Issue training ", v,"**"
+    return model
+
+def trainHSC(x,y,models):
+    shp = np.shape(y)
+    y = y[0:shp[0],1:shp[1]]
+    models[0] = trainHSChelper(x,y,models[0])
+    return models
+    
+def makePtree( x, models, pTree ):
+    from sklearn import svm
+    if not models:
+        return pTree
+    for a in models:
+        pTree[a] = [((models[a])[0]).predict_proba(x), makePtree(x,(models[a])[1],{}) ]
+    return pTree
+
+def testHSC( testData, models ):
+    # p(y1,y2,y3 | x ) = p( y3 | x, y1, y2 ) p( y2 | x, y1 ) p( y1 | x )
+    from sklearn import svm
+    f = open( testData )
+    x,y = pickle.load(f)
+    shp = np.shape(y)
+    shp_x = np.shape(x)
+    for j in range(0,shp[0]):
+        xX = np.reshape(x[j,:],(1,shp_x[1]))
+        yY = np.reshape(y[j,:],(shp[1],))
+        p = makePtree( xX, models, {} )   
+
+def hsc( trainingData, validationData ):
+    from sklearn import svm
+    #hierarchical stacked classifier
+    #checking if the height of the tree and the tree shape's height
+    #have same value
+    #assert height == len(shapeOfTree)
+    #extracting training data, x has to be a vector of any size while
+    #y must have size equal to that of the height of the tree
+    print 'Extracting Training Data from ' + str(trainingData)
+    f_train = open( trainingData, 'r' )
+    train_x, train_y = pickle.load( f_train )
+    shape_ty = np.shape( train_y )
+    shape_tx = np.shape( train_x )
+    assert shape_tx[0] == shape_ty[0]
+    height = shape_ty[1] - 1
+    print 'Training Data extracted of Shape: ' + str(shape_tx)
+    print 'Filling the Model Bag (currently using SVMs)'
+    modelBag = inferTree( train_y )
+    #Training the models
+    print 'Training Models with '+str(shape_tx[0])+' examples'
+    #trainedModelBag = modelBag
+    trainedModelBag = trainHSC( train_x, train_y, modelBag )
+    print 'Validating Models'
+    #Validating the models
+    print testHSC( validationData, trainedModelBag )
+    return trainedModelBag
