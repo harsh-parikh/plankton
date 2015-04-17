@@ -1,0 +1,121 @@
+acantharia_protist	2
+acantharia_protist_big_center	2
+acantharia_protist_halo	2
+amphipods	11
+appendicularian_fritillaridae	5	9
+appendicularian_slight_curve	5	9
+appendicularian_s_shape	5	9
+appendicularian_straight	5	9
+artifacts	1
+artifacts_edge	1
+chaetognath_non_sagitta	14
+chaetognath_other	14
+chaetognath_sagitta	14
+chordate_type1
+copepod_calanoid	11	12
+copepod_calanoid_eggs	11	12
+copepod_calanoid_eucalanus	11	12
+copepod_calanoid_flatheads	11	12
+copepod_calanoid_frillyAntennae	11	12
+copepod_calanoid_large	11	12
+copepod_calanoid_large_side_antennatucked	11	12
+copepod_calanoid_octomoms	11	12
+copepod_calanoid_small_longantennae	11	12
+copepod_cyclopoid_copilia	11	12
+copepod_cyclopoid_oithona	11	12
+copepod_cyclopoid_oithona_eggs	11	12
+copepod_other	11	12
+crustacean_other	11
+ctenophore_cestid	5	6
+ctenophore_cydippid_no_tentacles	5	6
+ctenophore_cydippid_tentacles	5	6
+ctenophore_lobate	5	6
+decapods	11	13
+detritus_blob	18
+detritus_filamentous	18
+detritus_other	18
+diatom_chain_string	4
+diatom_chain_tube	4
+echinoderm_larva_pluteus_brittlestar	16	17
+echinoderm_larva_pluteus_early	16	17
+echinoderm_larva_pluteus_typeC	16	17
+echinoderm_larva_pluteus_urchin	16	17
+echinoderm_larva_seastar_bipinnaria	16	17
+echinoderm_larva_seastar_brachiolaria	16	17
+echinoderm_seacucumber_auricularia_larva	16	17
+echinopluteus	16	17
+ephyra	5
+euphausiids	11	13
+euphausiids_young	11	13
+fecal_pellet	18
+fish_larvae_deep_body	10
+fish_larvae_leptocephali	10
+fish_larvae_medium_body	10
+fish_larvae_myctophids	10
+fish_larvae_thin_body	10
+fish_larvae_very_thin_body	10
+heteropod	15
+hydromedusae_aglaura	5	7
+hydromedusae_bell_and_tentacles	5	7
+hydromedusae_h15	5	7
+hydromedusae_haliscera	5	7
+hydromedusae_haliscera_small_sideview	5	7
+hydromedusae_liriope	5	7
+hydromedusae_narco_dark	5	7
+hydromedusae_narcomedusae	5	7
+hydromedusae_narco_young	5	7
+hydromedusae_other	5	7
+hydromedusae_partial_dark	5	7
+hydromedusae_shapeA	5	7
+hydromedusae_shapeA_sideview_small	5	7
+hydromedusae_shapeB	5	7
+hydromedusae_sideview_big	5	7
+hydromedusae_solmaris	5	7
+hydromedusae_solmundella	5	7
+hydromedusae_typeD	5	7
+hydromedusae_typeD_bell_and_tentacles	5	7
+hydromedusae_typeE	5	7
+hydromedusae_typeF	5	7
+invertebrate_larvae_other_A	16
+invertebrate_larvae_other_B	16
+jellies_tentacles	5
+polychaete
+protist_dark_center	2
+protist_fuzzy_olive	2
+protist_noctiluca	2
+protist_other	2
+protist_star	2
+pteropod_butterfly	15
+pteropod_theco_dev_seq	15
+pteropod_triangle	15
+radiolarian_chain	2
+radiolarian_colony	2
+shrimp_caridean	11	13
+shrimp-like_other	11	13
+shrimp_sergestidae	11	13
+shrimp_zoea	11	13
+siphonophore_calycophoran_abylidae	5	8
+siphonophore_calycophoran_rocketship_adult	5	8
+siphonophore_calycophoran_rocketship_young	5	8
+siphonophore_calycophoran_sphaeronectes	5	8
+siphonophore_calycophoran_sphaeronectes_stem	5	8
+siphonophore_calycophoran_sphaeronectes_young	5	8
+siphonophore_other_parts	5	8
+siphonophore_partial	5	8
+siphonophore_physonect	5	8
+siphonophore_physonect_young	5	8
+stomatopod	11
+tornaria_acorn_worm_larvae	16
+trichodesmium_bowtie	3
+trichodesmium_multiple	3
+trichodesmium_puff	3
+trichodesmium_tuft	3
+trochophore_larvae	16
+tunicate_doliolid	5	9
+tunicate_doliolid_nurse	5	9
+tunicate_partial	5	9
+tunicate_salp	5	9
+tunicate_salp_chains	5	9
+unknown_blobs_and_smudges	19
+unknown_sticks	19
+unknown_unclassified	19
